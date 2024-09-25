@@ -81,21 +81,22 @@ class Functions(metaclass=FunctionRegistry):
         return function(self, *resolved_args)
 
     def _validate_arguments(self, args, signature, function_name):
-        if signature and signature[-1].get('variadic'):
-            if len(args) < len(signature):
-                raise exceptions.VariadictArityError(
-                    len(signature), len(args), function_name)
-        elif len(args) != len(signature):
-            raise exceptions.ArityError(
-                len(signature), len(args), function_name)
-        return self._type_check(args, signature, function_name)
+        min_args = sum(1 for sig in signature if not sig.get('optional', False))
+        if len(args) < min_args:
+            raise exceptions.ArityError(min_args, len(args), function_name)
+
+        if len(args) > len(signature) and not signature[-1].get('variadic'):
+            raise exceptions.ArityError(len(signature), len(args), function_name)
+
+        self._type_check(args, signature, function_name)
+
 
     def _type_check(self, actual, signature, function_name):
-        for i in range(len(signature)):
+        for i in range(len(actual)):
             allowed_types = signature[i]['types']
-            if allowed_types:
-                self._type_check_single(actual[i], allowed_types,
-                                        function_name)
+            if allowed_types and not (signature[i].get('optional') and actual[i] is None):
+                self._type_check_single(actual[i], allowed_types, function_name)
+
 
     def _type_check_single(self, current, types, function_name):
         # Type checking involves checking the top level type,
